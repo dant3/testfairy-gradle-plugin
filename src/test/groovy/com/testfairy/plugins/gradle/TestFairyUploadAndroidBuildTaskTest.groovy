@@ -5,9 +5,9 @@ import org.junit.Assert
 import org.junit.Test
 
 class TestFairyUploadAndroidBuildTaskTest {
-    @Test void canAddTaskToProject() {
-        Project project = ProjectBuilder.builder().build()
-        def task = project.task('uploadTask', type: TestFairyAndroidBuildUploadTask)
-        Assert.assertTrue(task instanceof TestFairyAndroidBuildUploadTask)
-    }
+	@Test void canAddTaskToProject() {
+		Project project = ProjectBuilder.builder().build()
+		def task = project.task('uploadTask', type: TestFairyAndroidBuildUploadTask)
+		Assert.assertTrue(task instanceof TestFairyAndroidBuildUploadTask)
+	}
 }

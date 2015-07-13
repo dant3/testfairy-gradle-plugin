@@ -5,11 +5,11 @@ import org.junit.Assert
 import org.junit.Test
 
 class TestFairyPluginTest {
-    @Test void canApplyPlugin() {
-        Project project = ProjectBuilder.builder().build()
-        def androidExt = project.extensions.create('android', MockAndroidExtension)
-        project.apply(plugin: "testfairy")
-        project.task("packageDebug", type: MockPackageTask)
-        Assert.assertNotNull(project.tasks.findByName("testfairyDebug"))
-    }
+	@Test void canApplyPlugin() {
+		Project project = ProjectBuilder.builder().build()
+		def androidExt = project.extensions.create('android', MockAndroidExtension)
+		project.apply(plugin: "testfairy")
+		project.task("packageDebug", type: MockPackageTask)
+		Assert.assertNotNull(project.tasks.findByName("testfairyDebug"))
+	}
 }

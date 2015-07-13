@@ -34,24 +34,24 @@ class ApkTools {
         }
     }
 
-    public static String getMappingFileCompat(variant) {
+    public static File getMappingFileCompat(variant) {
         if (variant.metaClass.respondsTo(variant, "getMappingFile")) {
             // getMappingFile was added in Android Plugin 0.13
-            return variant.getMappingFile().toString()
+            return variant.getMappingFile()
         }
 
         // fallback to getProcessResources
         File f = new File(variant.processResources.proguardOutputFile.parent, 'mapping.txt')
         if (f.exists()) {
             // found as mapping.txt using getProguardOutputFile
-            return f.absolutePath.toString()
+            return f.absoluteFile
         }
 
         f = new File(variant.packageApplication.outputFile.parent)
         f = new File(f.parent, "proguard/${variant.name}/mapping.txt")
         if (f.exists()) {
             // found through getPackageApplication
-            return f.absolutePath.toString()
+            return f.absoluteFile
         }
 
         // any other ways to find mapping file?
@@ -61,14 +61,14 @@ class ApkTools {
     /**
      * Get a list of all files inside this APK file.
      *
-     * @param apkFilename
+     * @param apkFile
      * @return List<String>
      */
-    public static List<String> getApkFiles(String apkFilename) {
+    public static List<String> getApkFiles(File apkFile) {
         List<String> files = new ArrayList<String>()
 
-        ZipFile zf = new ZipFile(apkFilename)
-        Enumeration<? extends ZipEntry> e = zf.entries()
+        ZipFile zf = new ZipFile(apkFile)
+        Enumeration<? extends ZipEntry> e = zf.entries
         while (e.hasMoreElements()) {
             ZipEntry entry = e.nextElement()
             String entryName = entry.getName()
@@ -82,30 +82,24 @@ class ApkTools {
     /**
      * Checks if the given APK is signed
      *
-     * @param apkFilename
+     * @param apkFile
      * @return boolean
      */
-    public static boolean isApkSigned(String apkFilename) {
-        List<String> filenames = getApkFiles(apkFilename)
-        for (String f: filenames) {
-            if (f.startsWith("META-INF/") && f.endsWith("SF")) {
-                // found a signature file, this APK is signed
-                return true
-            }
-        }
-
-        return false
+    public static boolean isApkSigned(File apkFile) {
+        List<String> filenames = getApkFiles(apkFile)
+        String signatureFile = filenames.find { it.startsWith("META-INF/") && it.endsWith("SF")}
+        return signatureFile != null
     }
 
     /**
      * Remove all signature files from archive, turning it back to unsigned.
      *
-     * @param apkFilename
-     * @param outputFilename
+     * @param apkFile
+     * @param outputFile
      */
-    public static void removeSignature(String apkFilename, String outFilename) {
-        ZipArchiveInputStream zais = new ZipArchiveInputStream(new FileInputStream(apkFilename))
-        ZipArchiveOutputStream zaos = new ZipArchiveOutputStream(new FileOutputStream(outFilename))
+    public static void removeSignature(File apkFile, File outFile) {
+        ZipArchiveInputStream zais = new ZipArchiveInputStream(new FileInputStream(apkFile))
+        ZipArchiveOutputStream zaos = new ZipArchiveOutputStream(new FileOutputStream(outFile))
         while (true) {
             ZipArchiveEntry entry = zais.getNextZipEntry()
             if (entry == null) {
@@ -137,86 +131,88 @@ class ApkTools {
     /**
      * Remove previous signature and sign archive again. Works in-place, overwrites the original apk file.
      *
-     * @param apkFilename
+     * @param apkFile
      * @param sc
      */
-    public void resignApk(String apkFilename, sc) {
-        resignApk(configuration, apkFilename, sc)
+    public void resignApk(File apkFile, sc) {
+        resignApk(configuration, apkFile, sc)
     }
 
     /**
      * Remove previous signature and sign archive again. Works in-place, overwrites the original apk file.
      *
      * @param toolsConfig
-     * @param apkFilename
+     * @param apkFile
      * @param sc
      */
-    public static void resignApk(Configuration toolsConfig, String apkFilename, sc) {
-
-        // use a temporary file in the same directory as apkFilename
-        String outFilename = apkFilename + ".temp"
+    public static File resignApk(Configuration toolsConfig, File apkFile, sc) {
+        // use a temporary file in the same directory as apkFile
+        File tmpFile = new File(apkFile.getAbsolutePath() + ".temp")
 
         // remove signature onto temp file, sign and zipalign back onto original filename
-        removeSignature(apkFilename, outFilename)
-        signApkFile(toolsConfig, outFilename, sc)
-        zipAlignFile(toolsConfig, outFilename, apkFilename)
-        (new File(outFilename)).delete()
-
-        // make sure everything is still intact
-        validateApkSignature(toolsConfig, apkFilename)
-    }
-
-    /**
-     * Sign an APK file with the given signingConfig settings.
-     *
-     * @param apkFilename
-     * @param sc
-     */
-    public void signApkFile(String apkFilename, sc) {
-        signApkFile(configuration, apkFilename, sc)
-    }
-
-    /**
-     * Sign an APK file with the given signingConfig settings.
-     *
-     * @param toolsConfig
-     * @param apkFilename
-     * @param sc
-     */
-    public static void signApkFile(Configuration toolsConfig, String apkFilename, sc) {
-        def command = [toolsConfig.jarSignerPath, "-keystore", sc.storeFile, "-storepass", sc.storePassword, "-keypass", sc.keyPassword, "-digestalg", "SHA1", "-sigalg", "MD5withRSA", apkFilename, sc.keyAlias]
-        def proc = command.execute()
-        proc.consumeProcessOutput()
-        proc.waitFor()
-        if (proc.exitValue()) {
-            throw new GradleException("Could not jarsign ${apkFilename}, used this command:\n${command}")
+        try {
+            removeSignature(apkFile, tmpFile)
+            signApkFile(toolsConfig, tmpFile, sc)
+            zipAlignFile(toolsConfig, tmpFile, apkFile)
+            // make sure everything is still intact
+            validateApkSignature(toolsConfig, apkFile)
+            return apkFile;
+        } finally {
+            tmpFile.delete()
         }
     }
 
     /**
-     * Zipaligns input APK file onto outFilename.
+     * Sign an APK file with the given signingConfig settings.
      *
-     * @param inFilename
-     * @param outFilename
+     * @param apkFile
+     * @param sc
      */
-    public void zipAlignFile(String inFilename, String outFilename) {
-        zipAlignFile(configuration, inFilename, outFilename)
+    public void signApkFile(File apkFile, sc) {
+        signApkFile(configuration, apkFile, sc)
     }
 
     /**
-     * Zipaligns input APK file onto outFilename.
+     * Sign an APK file with the given signingConfig settings.
      *
      * @param toolsConfig
-     * @param inFilename
-     * @param outFilename
+     * @param apkFile
+     * @param sc
      */
-    public static void zipAlignFile(Configuration toolsConfig, String inFilename, String outFilename) {
-        def command = [toolsConfig.zipAlignPath, "-f", "4", inFilename, outFilename]
+    public static void signApkFile(Configuration toolsConfig, File apkFile, sc) {
+        def command = [toolsConfig.jarSignerPath, "-keystore", sc.storeFile, "-storepass", sc.storePassword, "-keypass", sc.keyPassword, "-digestalg", "SHA1", "-sigalg", "MD5withRSA", apkFile.absolutePath, sc.keyAlias]
         def proc = command.execute()
         proc.consumeProcessOutput()
         proc.waitFor()
         if (proc.exitValue()) {
-            throw new GradleException("Could not zipalign ${inFilename} onto ${outFilename}")
+            throw new GradleException("Could not jarsign ${apkFile}, used this command:\n${command}")
+        }
+    }
+
+    /**
+     * Zipaligns input APK file onto outFile.
+     *
+     * @param inFile
+     * @param outFile
+     */
+    public void zipAlignFile(File inFile, File outFile) {
+        zipAlignFile(configuration, inFile, outFile)
+    }
+
+    /**
+     * Zipaligns input APK file onto outFile.
+     *
+     * @param toolsConfig
+     * @param inFile
+     * @param outFile
+     */
+    public static void zipAlignFile(Configuration toolsConfig, File inFile, File outFile) {
+        def command = [toolsConfig.zipAlignPath, "-f", "4", inFile.absolutePath, outFile.absolutePath]
+        def proc = command.execute()
+        proc.consumeProcessOutput()
+        proc.waitFor()
+        if (proc.exitValue()) {
+            throw new GradleException("Could not zipalign ${inFile} onto ${outFile}")
         }
     }
 
@@ -225,10 +221,10 @@ class ApkTools {
      * Verifies that APK is signed properly. Will throw an exception
      * if not.
      *
-     * @param apkFilename
+     * @param apkFile
      */
-    public void validateApkSignature(String apkFilename) {
-        validateApkSignature(configuration, apkFilename)
+    public void validateApkSignature(File apkFile) {
+        validateApkSignature(configuration, apkFile)
     }
 
     /**
@@ -236,15 +232,15 @@ class ApkTools {
      * if not.
      *
      * @param toolsConfig
-     * @param apkFilename
+     * @param apkFile
      */
-    public static void validateApkSignature(Configuration toolsConfig, String apkFilename) {
-        def command = [toolsConfig.jarSignerPath, "-verify", apkFilename]
+    public static void validateApkSignature(Configuration toolsConfig, File apkFile) {
+        def command = [toolsConfig.jarSignerPath, "-verify", apkFile.absolutePath]
         def proc = command.execute()
         proc.consumeProcessOutput()
         proc.waitFor()
         if (proc.exitValue()) {
-            throw new GradleException("Could not jarsign ${apkFilename}, used this command:\n${command}")
+            throw new GradleException("Could not jarsign ${apkFile}, used this command:\n${command}")
         }
     }
 

@@ -1,5 +1,6 @@
 package com.testfairy.plugins.gradle
 
+import org.gradle.api.Action
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
@@ -17,19 +18,29 @@ class TestFairyPlugin implements Plugin<Project> {
 						def expectingTask = "package${buildVariant.name.capitalize()}".toString()
 						if (expectingTask.equals(projectTask.name)) {
 							def variantName = buildVariant.name.capitalize()
+
+							def configureTask = configureUploadTask(variantName, buildVariant, projectTask)
 							// create new task with name such as testfairyRelease and testfairyDebug
-							def uploadTask = project.task("testfairy${variantName}", type: TestFairyUploadTask)
-							uploadTask.configure {
-								description = "Uploads the ${variantName} build to TestFairy"
-								variant = buildVariant
-								// use outputFile from packageApp task
-								uploadedFile = projectTask.outputFile
-								dependsOn expectingTask
-							}
-							project.tasks.add(uploadTask)
+							configureTask.execute(
+									project.tasks.create("testfairy${variantName}", TestFairyAndroidBuildUploadTask)
+							)
 						}
 					}
 				}
+			}
+			// TODO: iOS app uploading definition
+		}
+	}
+
+	private static Action<TestFairyAndroidBuildUploadTask> configureUploadTask(variantName, androidAppVariant, packageTask) {
+		return new Action<TestFairyAndroidBuildUploadTask>() {
+			@Override
+			void execute(TestFairyAndroidBuildUploadTask task) {
+				task.description = "Uploads the ${variantName} build to TestFairy"
+				task.variant = androidAppVariant
+				// use outputFile from packageApp task
+				task.uploadedFile = packageTask.outputFile
+				task.dependsOn(packageTask)
 			}
 		}
 	}

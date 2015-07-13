@@ -15,18 +15,31 @@ class TestFairyUploader {
     /**
      * Upload an APK using /api/upload REST service.
      *
-     * @param project
      * @param extension
-     * @param apkFilename
+     * @param apkFile
+     * @param mappingFile
      * @return Object parsed json
      */
-    public static def uploadApk(TestFairyExtension extension, String apkFilename, String mappingFilename, String optChangelog) {
+    public static def uploadApk(TestFairyExtension extension, File apkFile, File mappingFile) {
+        return uploadApk(extension, apkFile, mappingFile, null)
+    }
+
+    /**
+     * Upload an APK using /api/upload REST service.
+     *
+     * @param extension
+     * @param apkFile
+     * @param mappingFile
+     * @param changelog
+     * @return Object parsed json
+     */
+    public static def uploadApk(TestFairyExtension extension, File apkFile, File mappingFile, String changelog) {
         String serverEndpoint = extension.getServerEndpoint()
         String url = "${serverEndpoint}/api/upload"
-        MultipartEntity entity = buildEntity(extension, apkFilename, mappingFilename)
+        MultipartEntity entity = buildEntity(extension, apkFile, mappingFile)
 
-        if (optChangelog) {
-            entity.addPart('changelog', new StringBody(optChangelog))
+        if (changelog) {
+            entity.addPart('changelog', new StringBody(changelog))
         }
 
         return post(url, entity)
@@ -39,13 +52,13 @@ class TestFairyUploader {
      * @param apkFilename
      * @return Object parsed json
      */
-    public static def uploadSignedApk(TestFairyExtension extension, String apkFilename) {
+    public static def uploadSignedApk(TestFairyExtension extension, File apkFile) {
         String serverEndpoint = extension.getServerEndpoint()
         String url = "${serverEndpoint}/api/upload-signed"
 
         MultipartEntity entity = new MultipartEntity()
         entity.addPart('api_key', new StringBody(extension.getApiKey()))
-        entity.addPart('apk_file', new FileBody(new File(apkFilename)))
+        entity.addPart('apk_file', new FileBody(apkFile))
 
         if (extension.getTestersGroups()) {
             // if omitted, no emails will be sent to testers
@@ -67,15 +80,15 @@ class TestFairyUploader {
      * @param extension
      * @return MultipartEntity
      */
-    public static MultipartEntity buildEntity(TestFairyExtension extension, String apkFilename, String mappingFilename) {
+    public static MultipartEntity buildEntity(TestFairyExtension extension, File apkFile, File mappingFile) {
         String apiKey = extension.getApiKey()
 
         MultipartEntity entity = new MultipartEntity()
         entity.addPart('api_key', new StringBody(apiKey))
-        entity.addPart('apk_file', new FileBody(new File(apkFilename)))
+        entity.addPart('apk_file', new FileBody(apkFile))
 
-        if (mappingFilename != null) {
-            entity.addPart('symbols_file', new FileBody(new File(mappingFilename)))
+        if (mappingFile != null) {
+            entity.addPart('symbols_file', new FileBody(mappingFile))
         }
 
         if (extension.getIconWatermark()) {

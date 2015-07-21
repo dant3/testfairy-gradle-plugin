@@ -68,7 +68,7 @@ class ApkTools {
 		List<String> files = new ArrayList<String>()
 
 		ZipFile zf = new ZipFile(apkFile)
-		Enumeration<? extends ZipEntry> e = zf.entries
+		Enumeration<? extends ZipEntry> e = zf.getEntries()
 		while (e.hasMoreElements()) {
 			ZipEntry entry = e.nextElement()
 			String entryName = entry.getName()
@@ -134,8 +134,8 @@ class ApkTools {
 	 * @param apkFile
 	 * @param sc
 	 */
-	public void resignApk(File apkFile, sc) {
-		resignApk(configuration, apkFile, sc)
+	public File resignApk(File apkFile, sc) {
+		return resignApk(configuration, apkFile, sc)
 	}
 
 	/**

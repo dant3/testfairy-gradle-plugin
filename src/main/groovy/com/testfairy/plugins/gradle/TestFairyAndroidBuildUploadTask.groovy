@@ -57,7 +57,7 @@ class TestFairyAndroidBuildUploadTask extends DefaultTask {
 
 		// use outputFile from packageApp task
 		File apkFile = uploadedFile.absoluteFile
-		File proguardMappingFile = findProguardMappingFile()
+		File proguardMappingFile = findProguardMappingFile(extension)
 
 		project.logger.info("Instrumenting ${apkFile} using apiKey ${apiKey} and server ${serverEndpoint}")
 
@@ -70,7 +70,7 @@ class TestFairyAndroidBuildUploadTask extends DefaultTask {
 		return json.build_url
 	}
 
-	private File findProguardMappingFile() {
+	private File findProguardMappingFile(extension) {
 		if (ApkTools.isMinifyEnabledCompat(variant.buildType) && extension.uploadProguardMapping) {
 			// proguard-mapping.txt upload is enabled
 			def proguardMappingFile = ApkTools.getMappingFileCompat(variant)
